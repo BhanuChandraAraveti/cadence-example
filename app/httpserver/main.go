@@ -24,13 +24,14 @@ type Service struct {
 
 func (h *Service) triggerHelloWorld(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
-		accountId := r.URL.Query().Get("accountId")
+		applicantID := r.URL.Query().Get("applicant_id")
+		h.logger.Info("####### flow!", zap.String("applicantId", applicantID))
 
 		wo := client.StartWorkflowOptions{
 			TaskList:                     workflows.TaskListName,
 			ExecutionStartToCloseTimeout: time.Hour * 24,
 		}
-		execution, err := h.cadenceAdapter.CadenceClient.StartWorkflow(context.Background(), wo, workflows.Workflow, accountId)
+		execution, err := h.cadenceAdapter.CadenceClient.StartWorkflow(context.Background(), wo, workflows.Workflow, applicantID)
 		if err != nil {
 			http.Error(w, "Error starting workflow!", http.StatusBadRequest)
 			return
@@ -111,34 +112,60 @@ func (h *Service) signalHelloWorld(w http.ResponseWriter, r *http.Request) {
 type Mystruct struct {
 	WorkflowId string `json:"workflowId"`
 	RunId string `json:"runId"`
-	Age int `json:"age"`
+	Payload interface{} `json:"payload"`
+	ApplicantId string `json:"applicantId"`
 }
 
 func (h *Service) submit(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		h.logger.Info("$$$$$")
 
-		payload := Mystruct{}
-		err := json.NewDecoder(r.Body).Decode(&payload)
+		data := Mystruct{}
+		err := json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		workflowId := payload.WorkflowId
-		age:= payload.Age
+		workflowId := data.WorkflowId
+		h.logger.Info(workflowId)
+		h.logger.Info("payload", zap.Any("data", data))
 		//runId := payload.RunId
 
-		err = h.cadenceAdapter.CadenceClient.SignalWorkflow(context.Background(), workflowId, "", workflows.SignalName, age)
+		err = h.cadenceAdapter.CadenceClient.SignalWorkflow(context.Background(), workflowId, "", workflows.SignalName, data)
 		if err != nil {
 			http.Error(w, "Error signaling workflow!", http.StatusBadRequest)
 			return
 		}
 
-		h.logger.Info("Signaled work flow with the following params!", zap.String("WorkflowId", workflowId), zap.Int("Age", age))
+		h.logger.Info("Signaled work flow with the following params!", zap.String("WorkflowId", workflowId), zap.Int("Age", 1))
 
 		js, _ := json.Marshal("Success")
 
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(js)
+	} else {
+		_, _ = w.Write([]byte("Invalid Method!" + r.Method))
+	}
+}
+
+
+func (h *Service) orientationStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		accountId := r.URL.Query().Get("accountId")
+
+		wo := client.StartWorkflowOptions{
+			TaskList:                     workflows.TaskListName,
+			ExecutionStartToCloseTimeout: time.Hour * 24,
+		}
+		execution, err := h.cadenceAdapter.CadenceClient.StartWorkflow(context.Background(), wo, workflows.SampleParentWorkflow, accountId)
+		if err != nil {
+			http.Error(w, "Error starting workflow!", http.StatusBadRequest)
+			return
+		}
+
+		h.logger.Info("Started work flow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
+		js, _ := json.Marshal(execution)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(js)
 	} else {
@@ -158,6 +185,7 @@ func main() {
 	http.HandleFunc("/api/get-current-screen", service.LastCompletedActivity)
 	http.HandleFunc("/api/submit", service.submit)
 	http.HandleFunc("/api/signal-hello-world", service.signalHelloWorld)
+	http.HandleFunc("/api/orientation-start", service.orientationStart)
 
 	addr := ":3030"
 	log.Println("Starting Server! Listening on:", addr)
