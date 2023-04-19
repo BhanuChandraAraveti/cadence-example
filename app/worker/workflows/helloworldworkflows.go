@@ -302,47 +302,47 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	//
 	
 	
-	// // STREAM Selection Activity
-	// selector = workflow.NewSelector(ctx)
-	// signalChan = workflow.GetSignalChannel(ctx, signalName)
-	// err = workflow.ExecuteActivity(ctx, streamSelectionActivity).Get(ctx, &activityResult)
-	// if err != nil {
-	// 	logger.Error("Watch Video Activity failed.", zap.Error(err))
-	// 	return "", err
-	// }
-	// selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
-	// 	c.Receive(ctx, &data)
-	// 	workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
-	// })
-	// workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
-	// // Wait for signal
-	// selector.Select(ctx)
+    // STREAM Selection Activity
+	selector = workflow.NewSelector(ctx)
+	signalChan = workflow.GetSignalChannel(ctx, signalName)
+	err = workflow.ExecuteActivity(ctx, streamSelectionActivity).Get(ctx, &activityResult)
+	if err != nil {
+		logger.Error("Watch Video Activity failed.", zap.Error(err))
+		return "", err
+	}
+	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
+		c.Receive(ctx, &data)
+		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
+	})
+	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
+	// Wait for signal
+	selector.Select(ctx)
 
-	// // call BE API
-	// msg, err = call(data)
-	// logger.Info(msg)
+	// call BE API
+	msg, err = call(data)
+	logger.Info(msg)
 
 
 
 	// Grade Activity
-	// selector = workflow.NewSelector(ctx)
-	// signalChan = workflow.GetSignalChannel(ctx, signalName)
-	// err = workflow.ExecuteActivity(ctx, gradeActivity).Get(ctx, &activityResult)
-	// if err != nil {
-	// 	logger.Error("Watch Video Activity failed.", zap.Error(err))
-	// 	return "", err
-	// }
-	// selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
-	// 	c.Receive(ctx, &data)
-	// 	workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
-	// })
-	// workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
-	// // Wait for signal
-	// selector.Select(ctx)
+	selector = workflow.NewSelector(ctx)
+	signalChan = workflow.GetSignalChannel(ctx, signalName)
+	err = workflow.ExecuteActivity(ctx, gradeActivity).Get(ctx, &activityResult)
+	if err != nil {
+		logger.Error("Watch Video Activity failed.", zap.Error(err))
+		return "", err
+	}
+	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
+		c.Receive(ctx, &data)
+		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
+	})
+	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
+	// Wait for signal
+	selector.Select(ctx)
 
-	// // call BE API
-	// msg, err = call(data)
-	// logger.Info(msg)
+	// call BE API
+	msg, err = call(data)
+	logger.Info(msg)
 
 
 
