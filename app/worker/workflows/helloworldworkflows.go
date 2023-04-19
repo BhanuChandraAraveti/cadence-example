@@ -40,6 +40,9 @@ func init() {
 	activity.Register(watchVideoActivity)
 	activity.Register(gradeActivity)
 	activity.Register(streamSelectionActivity)
+	activity.Register(teacherCETAndSOPActivity)
+	activity.Register(uploadLessonVideoActivity)
+	activity.Register(submitDocumentsActivity)
 }
 
 var activityOptions = workflow.ActivityOptions{
@@ -213,6 +216,33 @@ func streamSelectionActivity(ctx context.Context) (string, error) {
 	return "Stream Selection activity ended", nil
 }
 
+func teacherCETAndSOPActivity(ctx context.Context) (string, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("CET and SOP activity started")
+	// Ask frontend to show the watchVideo Screen
+	call_api()
+	logger.Info("CET and SOP activity ended")
+	return "CET and SOP activity ended", nil
+}
+
+func uploadLessonVideoActivity(ctx context.Context) (string, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("Lesson upload activity started")
+	// Ask frontend to show the watchVideo Screen
+	call_api()
+	logger.Info("Lesson upload activity ended")
+	return "Lesson upload activity ended", nil
+}
+
+func submitDocumentsActivity(ctx context.Context) (string, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("Submit documents activity started")
+	// Ask frontend to show the watchVideo Screen
+	call_api()
+	logger.Info("Submit documents activity ended")
+	return "Submit documents activity ended", nil
+}
+
 type RequestBody struct {
     Name  string `json:"name"`
     Email string `json:"email"`
@@ -364,6 +394,88 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	selector.Select(ctx)
 
 	// call BE API
+	// msg, err = call(data)
+	// logger.Info(msg)
+	//
+
+
+	// CET and SOP
+	selector = workflow.NewSelector(ctx)
+	signalChan = workflow.GetSignalChannel(ctx, signalName)
+	err = workflow.ExecuteActivity(ctx, teacherCETAndSOPActivity).Get(ctx, &activityResult)
+	if err != nil {
+		logger.Error("Watch Video Activity failed.", zap.Error(err))
+		return "", err
+	}
+
+	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
+		c.Receive(ctx, &data)
+		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
+	})
+	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
+	// Wait for signal
+	selector.Select(ctx)
+
+	// call BE API
+	// msg, err = call(data)
+	// logger.Info(msg)
+	//
+
+
+	// Upload Lesson Video
+	selector = workflow.NewSelector(ctx)
+	signalChan = workflow.GetSignalChannel(ctx, signalName)
+	err = workflow.ExecuteActivity(ctx, uploadLessonVideoActivity).Get(ctx, &activityResult)
+	if err != nil {
+		logger.Error("Watch Video Activity failed.", zap.Error(err))
+		return "", err
+	}
+
+	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
+		c.Receive(ctx, &data)
+		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
+	})
+	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
+	// Wait for signal
+	selector.Select(ctx)
+
+	// call BE API
+	// msg, err = call(data)
+	// logger.Info(msg)
+	//
+
+
+
+	// Submit Documents
+	selector = workflow.NewSelector(ctx)
+	signalChan = workflow.GetSignalChannel(ctx, signalName)
+	err = workflow.ExecuteActivity(ctx, submitDocumentsActivity).Get(ctx, &activityResult)
+	if err != nil {
+		logger.Error("Watch Video Activity failed.", zap.Error(err))
+		return "", err
+	}
+
+	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
+		c.Receive(ctx, &data)
+		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
+	})
+	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
+	// Wait for signal
+	selector.Select(ctx)
+
+	// type Mystruct struct {
+	// 	WorkflowId string `json:"workflowId"`
+	// 	RunId string `json:"runId"`
+	// 	Payload interface{} `json:"payload"`
+	// 	ApplicantId string `json:"applicantId"`
+	// }
+
+	data.Payload = struct{
+		CreateTeacher bool `json:"CREATE_TEACHER"`
+	}{
+		CreateTeacher: true,
+	}
+	// call BE API
 	msg, err = call(data)
 	logger.Info(msg)
 	//
@@ -371,14 +483,6 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	logger.Info("Workflow completed.")
 	return "Workflow completed.", nil
 }
-
-
-
-
-
-
-
-
 
 type BEStruct struct {
 	ApplicantID       string `json:"applicant_id"`
@@ -416,8 +520,6 @@ func updateProfile(data Mystruct) (string, error){
 	fmt.Println("Response Status:", response.Status)
 	return response.Status, nil
 }
-
-
 
 
 func sendWorkflowId(ctx context.Context, applicantID string, workflowID string, runID string) (string, error){
