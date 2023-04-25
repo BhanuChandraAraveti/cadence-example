@@ -297,6 +297,14 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	logger.Info("Teacher signup workflow started")
 	logger.Info("Applicant ID: " + applicantID)
 
+	queryResult := 0
+	err := workflow.SetQueryHandler(ctx, "state", func(input []byte) (int, error) {
+		return queryResult, nil
+	})
+	if err != nil {
+		logger.Info("SetQueryHandler failed: " + err.Error())
+	}
+
 	info := workflow.GetInfo(ctx)
   	workflowID := info.WorkflowExecution.ID
 	runID := info.WorkflowExecution.RunID
@@ -304,7 +312,7 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 
 
 	var activityResult string
-	err := workflow.ExecuteActivity(ctx, degreeDetailsActivity, applicantID, workflowID, runID).Get(ctx, &activityResult)
+	err = workflow.ExecuteActivity(ctx, degreeDetailsActivity, applicantID, workflowID, runID).Get(ctx, &activityResult)
 	if err != nil {
 		logger.Error("Degree Details Activity failed.", zap.Error(err))
 		return "", err
@@ -317,6 +325,7 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	signalChan := workflow.GetSignalChannel(ctx, signalName)
 	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
 		c.Receive(ctx, &data)
+		queryResult += 1
 		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
 	})
 	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
@@ -342,6 +351,7 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	}
 	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
 		c.Receive(ctx, &data)
+		queryResult += 1
 		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
 	})
 	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
@@ -364,6 +374,7 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	}
 	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
 		c.Receive(ctx, &data)
+		queryResult += 1
 		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
 	})
 	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
@@ -387,6 +398,7 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 
 	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
 		c.Receive(ctx, &data)
+		queryResult += 1
 		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
 	})
 	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
@@ -410,6 +422,7 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 
 	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
 		c.Receive(ctx, &data)
+		queryResult += 1
 		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
 	})
 	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
@@ -433,6 +446,7 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 
 	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
 		c.Receive(ctx, &data)
+		queryResult += 1
 		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
 	})
 	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
@@ -457,6 +471,7 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 
 	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
 		c.Receive(ctx, &data)
+		queryResult += 1
 		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
 	})
 	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)

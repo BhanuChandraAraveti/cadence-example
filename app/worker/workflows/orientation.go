@@ -2,55 +2,87 @@
 package workflows
 
 import (
-	"errors"
-	"fmt"
-	"time"
-
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
 )
 
-// sampleChildWorkflow workflow decider
-func SampleChildWorkflow(ctx workflow.Context, totalCount, runCount int) (string, error) {
-	logger := workflow.GetLogger(ctx)
-	logger.Info("Child workflow execution started.")
-	if runCount <= 0 {
-		logger.Error("Invalid valid for run count.", zap.Int("RunCount", runCount))
-		return "", errors.New("invalid run count")
-	}
-
-	totalCount++
-	runCount--
-	if runCount == 0 {
-		result := fmt.Sprintf("Child workflow execution completed after %v runs", totalCount)
-		logger.Info("Child workflow completed.", zap.String("Result", result))
-		return result, nil
-	}
-
-	logger.Info("Child workflow starting new run.", zap.Int("RunCount", runCount), zap.Int("TotalCount",
-		totalCount))
-	return "", workflow.NewContinueAsNewError(ctx, SampleChildWorkflow, totalCount, runCount)
+// This is registration process where you register all your workflows
+// and activity function handlers.
+func init() {
+	workflow.Register(OrientationWorkflow)
 }
 
+type WorkflowState struct {
+    Current WorkflowStep   `json:"current"`
+    Steps   []WorkflowStep `json:"steps"`
+}
 
-func SampleParentWorkflow(ctx workflow.Context) (string, error) {
+type WorkflowStep struct {
+    Action     string  `json:"action"`
+    Index      int     `json:"index"`
+    Status     string  `json:"status"`
+    WorkflowID string `json:"workflow_id,omitempty"`
+	RunID      string `json:"run_id,omitempty"`
+}
+
+func OrientationWorkflow(ctx workflow.Context, applicantID string) (string, error) {
+	ctx = workflow.WithActivityOptions(ctx, activityOptions)
+
 	logger := workflow.GetLogger(ctx)
-	execution := workflow.GetInfo(ctx).WorkflowExecution
-	// Parent workflow can choose to specify it's own ID for child execution.  Make sure they are unique for each execution.
-	childID := fmt.Sprintf("child_workflow:%v", execution.RunID)
-	cwo := workflow.ChildWorkflowOptions{
-		// Do not specify WorkflowID if you want cadence to generate a unique ID for child execution
-		WorkflowID:                   childID,
-		ExecutionStartToCloseTimeout: time.Minute,
+	logger.Info("Teacher Orientation workflow started")
+	logger.Info("Applicant ID: " + applicantID)
+
+	info := workflow.GetInfo(ctx)
+  	workflowID := info.WorkflowExecution.ID
+	runID := info.WorkflowExecution.RunID
+
+	workflowStep := WorkflowStep{
+		Action: "orientation",
+		Index: 1,
+		Status: "IN_PROGRESS",
+		WorkflowID: workflowID,
+		RunID: runID,
 	}
-	ctx = workflow.WithChildOptions(ctx, cwo)
-	var result string
-	err := workflow.ExecuteChildWorkflow(ctx, SampleChildWorkflow, 0, 5).Get(ctx, &result)
+	
+	workflowState := WorkflowState{
+		Current: workflowStep,
+		Steps: []WorkflowStep{workflowStep},
+	}
+
+	err := workflow.SetQueryHandler(ctx, "state", func(input []byte) (WorkflowState, error) {
+		return workflowState, nil
+	})
 	if err != nil {
-		logger.Error("Parent execution received child execution failure.", zap.Error(err))
+		logger.Info("SetQueryHandler failed: " + err.Error())
+	}
+
+	var activityResult string
+	err = workflow.ExecuteActivity(ctx, degreeDetailsActivity, applicantID, workflowID, runID).Get(ctx, &activityResult)
+	if err != nil {
+		logger.Error("Degree Details Activity failed.", zap.Error(err))
 		return "", err
 	}
 
-	logger.Info("Parent execution completed.", zap.String("Result", result))
-	return "", nil
+	signalName := SignalName
+  	selector := workflow.NewSelector(ctx)
+ 	var data Mystruct
+	signalChan := workflow.GetSignalChannel(ctx, signalName)
+	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
+		c.Receive(ctx, &data)
+		workflowState.Current.Status = "COMPLETED"
+		workflowState.Steps[0].Status = "COMPLETED"
+		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
+	})
+	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
+
+	// Wait for signal
+	selector.Select(ctx)
+	logger.Info("payload", zap.Any("data", data))
+
+	// call BE API
+	var msg string
+	msg, err = call(data)
+	logger.Info(msg)
+
+	return "Teacher Orientation Completed", nil
 }

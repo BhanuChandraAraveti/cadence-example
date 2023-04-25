@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -38,6 +39,78 @@ func (h *Service) triggerHelloWorld(w http.ResponseWriter, r *http.Request) {
 		}
 
 		h.logger.Info("Started work flow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
+		js, _ := json.Marshal(execution)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(js)
+	} else {
+		_, _ = w.Write([]byte("Invalid Method!" + r.Method))
+	}
+}
+
+
+func (h *Service) triggerOrientation(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		applicantID := r.URL.Query().Get("applicant_id")
+		h.logger.Info("####### flow!", zap.String("applicantId", applicantID))
+
+		wo := client.StartWorkflowOptions{
+			TaskList:                     workflows.TaskListName,
+			ExecutionStartToCloseTimeout: time.Hour * 24,
+		}
+		execution, err := h.cadenceAdapter.CadenceClient.StartWorkflow(context.Background(), wo, workflows.OrientationWorkflow, applicantID)
+		if err != nil {
+			http.Error(w, "Error starting orientation workflow!", http.StatusBadRequest)
+			return
+		}
+
+		resp, err := h.cadenceAdapter.CadenceClient.QueryWorkflowWithOptions(context.Background(), &client.QueryWorkflowWithOptionsRequest{
+			WorkflowID:            execution.ID,
+			RunID:                 execution.RunID,
+			QueryType:             "state",
+			QueryConsistencyLevel: s.QueryConsistencyLevelStrong.Ptr(),
+		})
+
+		h.logger.Info("Started orientation workflow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
+		h.logger.Info("Query Response", zap.Any("resp", resp), zap.Any("err", err))
+		//for loop ever 5 seconds until the state is completed
+		for resp.QueryResult == nil {
+			time.Sleep(5 * time.Second)
+			resp, err = h.cadenceAdapter.CadenceClient.QueryWorkflowWithOptions(context.Background(), &client.QueryWorkflowWithOptionsRequest{
+				WorkflowID:            execution.ID,
+				RunID:                 execution.RunID,
+				QueryType:             "state",
+				QueryConsistencyLevel: s.QueryConsistencyLevelStrong.Ptr(),
+			})
+		}
+
+		h.logger.Info("Query Response", zap.Any("resp", resp), zap.Any("err", err))
+
+		//execution.AppendObject("query", resp)
+
+		js, _ := json.Marshal(execution)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(js)
+	} else {
+		_, _ = w.Write([]byte("Invalid Method!" + r.Method))
+	}
+}
+
+func (h *Service) parentStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		applicantID := r.URL.Query().Get("applicant_id")
+		h.logger.Info("####### flow!", zap.String("applicantId", applicantID))
+
+		wo := client.StartWorkflowOptions{
+			TaskList:                     workflows.TaskListName,
+			ExecutionStartToCloseTimeout: time.Hour * 24,
+		}
+		execution, err := h.cadenceAdapter.CadenceClient.StartWorkflow(context.Background(), wo, workflows.SampleParentWorkflow)
+		if err != nil {
+			http.Error(w, "Error starting workflow!", http.StatusBadRequest)
+			return
+		}
+
+		h.logger.Info("Parent Started work flow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
 		js, _ := json.Marshal(execution)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(js)
@@ -173,6 +246,171 @@ func (h *Service) orientationStart(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// func (h *Service) listChildWorkflowIDs(w http.ResponseWriter, r *http.Request) {
+// 	if r.Method == "POST" {
+// 		parentWorkflowID := r.URL.Query().Get("parentWorkflowID")
+// 		runID := r.URL.Query().Get("runId")
+
+// 		workflowStub := h.cadenceAdapter.CadenceClient.GetWorkflow(context.Background(), parentWorkflowID, runID)
+// 		listChildExecutionsResponse, err := workflowStub.ListChildExecutions(context.Background(), &s.ListChildExecutionsRequest{})
+
+// 		if err != nil {
+// 			return nil, err
+// 		}
+	
+// 		// Extract the child workflow IDs from the response
+// 		var childWorkflowIDs []string
+// 		for _, childExecutionInfo := range listChildExecutionsResponse.Executions {
+// 			childWorkflowIDs = append(childWorkflowIDs, childExecutionInfo.GetExecution().GetWorkflowId())
+// 		}
+
+// 		h.logger.Info("Signaled work flow with the following params!")
+
+// 		js, _ := json.Marshal(childWorkflowIDs)
+
+// 		w.Header().Set("Content-Type", "application/json")
+// 		_, _ = w.Write(js)
+// 	} else {
+// 		_, _ = w.Write([]byte("Invalid Method!" + r.Method))
+// 	}
+// }
+
+// func listChildWorkflowIDs(parentWorkflowID string) ([]string, error) {
+//     // Create a Cadence client
+//     c, err := client.NewClient(client.Options{})
+//     if err != nil {
+//         return nil, err
+//     }
+
+//     // Get a workflow stub for the parent workflow
+//     workflowOptions := client.StartWorkflowOptions{
+//         ID:        parentWorkflowID,
+//         TaskQueue: "my-task-queue",
+//     }
+//     workflowClient := c.WorkflowClient
+//     workflowStub := workflowClient.GetWorkflow(workflowOptions.ID, "", workflowOptions)
+
+//     // Use the workflow stub to call ListChildExecutions API
+//     listChildExecutionsResponse, err := workflowStub.ListChildExecutions(context.Background(), &shared.ListChildExecutionsRequest{})
+//     if err != nil {
+//         return nil, err
+//     }
+
+//     // Extract the child workflow IDs from the response
+//     var childWorkflowIDs []string
+//     for _, childExecutionInfo := range listChildExecutionsResponse.Executions {
+//         childWorkflowIDs = append(childWorkflowIDs, childExecutionInfo.GetExecution().GetWorkflowId())
+//     }
+
+//     return childWorkflowIDs, nil
+// }
+
+
+func (h *Service)getWorkflowHistory(c client.Client, domain string, workflowID string, runID string) (*s.History, error) {
+	execution := s.WorkflowExecution{
+		WorkflowId: &workflowID,
+		RunId:      &runID,
+	}
+	historyRequest := s.GetWorkflowExecutionHistoryRequest{
+		Domain:    &domain,
+		Execution: &execution,
+	}
+	ctx := context.Background()
+	h.logger.Info("@@@", zap.Any("WorkflowExecution", execution))
+	h.logger.Info("@@@", zap.Any("GetWorkflowExecutionHistoryRequest", historyRequest))
+	h.logger.Info("@@@", zap.Any("context Background", context.Background()))
+	historyResp, err := h.cadenceAdapter.ServiceClient.GetWorkflowExecutionHistory(ctx, &historyRequest)
+	if err != nil {
+		h.logger.Info("@@@", zap.Any("err", err))
+		return nil, err
+	}
+	return historyResp.History, nil
+}
+
+// func (h *Service)getWorkflowHistory(c client.Client, domain string, workflowID string, runID string) (*s.History, error) {
+// 	execution := s.WorkflowExecution{
+// 		WorkflowId: &workflowID,
+// 		RunId:      &runID,
+// 	}
+// 	historyRequest := s.GetWorkflowExecutionHistoryRequest{
+// 		Domain:    &domain,
+// 		Execution: &execution,
+// 	}
+// 	ctx := context.Background()
+// 	h.logger.Info("@@@", zap.Any("WorkflowExecution", execution))
+// 	h.logger.Info("@@@", zap.Any("GetWorkflowExecutionHistoryRequest", historyRequest))
+// 	h.logger.Info("@@@", zap.Any("context Background", context.Background()))
+// 	iter := c.GetWorkflowHistory(ctx, workflowID, runID, false, s.HistoryEventFilterTypeAllEvent)
+// 	for iter.HasNext() {
+// 		event, err := iter.Next()
+// 		if err != nil {
+// 			h.logger.Info("@@@", zap.Any("err", err))
+// 			return nil, err
+// 		}
+// 		if event.GetEventType() == s.EventTypeActivityTaskCompleted {
+// 		}
+// 		if event.GetEventType() == s.EventTypeActivityTaskFailed {
+// 		}
+// 	}
+	
+// 	return historyResp.History, nil
+// }
+
+func processWorkflowHistory(history *s.History) ([]*s.HistoryEvent, *s.HistoryEvent) {
+	var taskList []*s.HistoryEvent
+	var nextTask *s.HistoryEvent
+
+	for _, event := range history.Events {
+		switch event.GetEventType() {
+		case s.EventTypeActivityTaskScheduled:
+			taskList = append(taskList, event)
+			if nextTask == nil {
+				nextTask = event
+			}
+		case s.EventTypeActivityTaskCompleted:
+			nextTask = nil
+		}
+	}
+
+	return taskList, nextTask
+}
+
+func (h *Service) check(w http.ResponseWriter, r *http.Request) {
+	//cadenceClient := createCadenceClient("7833")
+	cadenceClient := h.cadenceAdapter.CadenceClient
+	history, err := h.getWorkflowHistory(cadenceClient, "simple-domain","df07595c-c61d-4a23-8187-4c742b4641da", "4872f259-f4c7-4036-9477-70d43d54c1e5")
+	if err != nil {
+		panic("Failed to get workflow history.")
+	}
+
+	taskList, nextTask := processWorkflowHistory(history)
+	fmt.Println("Task list:", taskList)
+	fmt.Println("Next task:", nextTask)
+	fmt.Println("######")
+}
+
+// func createCadenceClient(hostPort string) client.Client {
+// 	ch, err := tchannel.NewChannelTransport(tchannel.ServiceName("cadence-client"), tchannel.ListenAddr(hostPort))
+// 	if err != nil {
+// 		panic("Failed to create TChannel transport.")
+// 	}
+
+// 	dispatcher := yarpc.NewDispatcher(yarpc.Config{
+// 		Name: "cadence-client",
+// 		Outbounds: yarpc.Outbounds{
+// 			"cadence": {Unary: ch.NewSingleOutbound(hostPort)},
+// 		},
+// 	})
+// 	dispatcher.Start()
+// 	defer dispatcher.Stop()
+
+// 	runtime := z.NewScope()
+// 	cadenceClient := workflowserviceclient.New(dispatcher.ClientConfig("cadence"), client.Options{MetricsScope: runtime})
+// 	return client.New(cadenceClient)
+// }
+
+
+
 
 func main() {
 	var appConfig config.AppConfig
@@ -182,10 +420,13 @@ func main() {
 
 	service := Service{&cadenceClient, appConfig.Logger}
 	http.HandleFunc("/api/start-signup-workflow", service.triggerHelloWorld)
+	http.HandleFunc("/api/start-orientation-workflow", service.triggerOrientation)
 	http.HandleFunc("/api/get-current-screen", service.LastCompletedActivity)
 	http.HandleFunc("/api/submit", service.submit)
 	http.HandleFunc("/api/signal-hello-world", service.signalHelloWorld)
 	http.HandleFunc("/api/orientation-start", service.orientationStart)
+	http.HandleFunc("/api/start-parent", service.parentStart)
+	http.HandleFunc("/api/history", service.check)
 
 	addr := ":3030"
 	log.Println("Starting Server! Listening on:", addr)

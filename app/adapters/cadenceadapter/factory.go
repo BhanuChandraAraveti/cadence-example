@@ -42,6 +42,7 @@ func (b *WorkflowClientBuilder) BuildCadenceClient() (client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	//service.GetWorkflowExecutionHistory()
 
 	return client.NewClient(
 		service, b.domain, &client.Options{MetricsScope: b.metricsScope}), nil
