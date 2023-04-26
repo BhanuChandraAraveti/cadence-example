@@ -70,24 +70,106 @@ func (h *Service) triggerOrientation(w http.ResponseWriter, r *http.Request) {
 			QueryConsistencyLevel: s.QueryConsistencyLevelStrong.Ptr(),
 		})
 
-		h.logger.Info("Started orientation workflow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
-		h.logger.Info("Query Response", zap.Any("resp", resp), zap.Any("err", err))
-		//for loop ever 5 seconds until the state is completed
-		for resp.QueryResult == nil {
-			time.Sleep(5 * time.Second)
-			resp, err = h.cadenceAdapter.CadenceClient.QueryWorkflowWithOptions(context.Background(), &client.QueryWorkflowWithOptionsRequest{
-				WorkflowID:            execution.ID,
-				RunID:                 execution.RunID,
-				QueryType:             "state",
-				QueryConsistencyLevel: s.QueryConsistencyLevelStrong.Ptr(),
-			})
+		if err != nil {
+			http.Error(w, "Error starting orientation workflow!", http.StatusBadRequest)
+			return
 		}
 
-		h.logger.Info("Query Response", zap.Any("resp", resp), zap.Any("err", err))
-
+		queryResult:= workflows.Response{}
+		resp.QueryResult.Get(&queryResult.WorkflowState)
+		queryResult.WorkflowID = execution.ID
+		queryResult.RunID = execution.RunID
+		h.logger.Info("Started orientation workflow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
+		h.logger.Info("Query Result", zap.Any("hasValue", queryResult))
 		//execution.AppendObject("query", resp)
 
 		js, _ := json.Marshal(execution)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(js)
+	} else {
+		_, _ = w.Write([]byte("Invalid Method!" + r.Method))
+	}
+}
+
+func (h *Service) triggerSetup(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		applicantID := r.URL.Query().Get("applicant_id")
+		h.logger.Info("####### flow!", zap.String("applicantId", applicantID))
+
+		wo := client.StartWorkflowOptions{
+			TaskList:                     workflows.TaskListName,
+			ExecutionStartToCloseTimeout: time.Hour * 24,
+		}
+		execution, err := h.cadenceAdapter.CadenceClient.StartWorkflow(context.Background(), wo, workflows.SetupWorkflow, applicantID)
+		if err != nil {
+			http.Error(w, "Error starting Setup workflow!", http.StatusBadRequest)
+			return
+		}
+
+		resp, err := h.cadenceAdapter.CadenceClient.QueryWorkflowWithOptions(context.Background(), &client.QueryWorkflowWithOptionsRequest{
+			WorkflowID:            execution.ID,
+			RunID:                 execution.RunID,
+			QueryType:             "state",
+			QueryConsistencyLevel: s.QueryConsistencyLevelStrong.Ptr(),
+		})
+
+		if err != nil {
+			http.Error(w, "Error starting Setup workflow!", http.StatusBadRequest)
+			return
+		}
+
+		queryResult:= workflows.Response{}
+		resp.QueryResult.Get(&queryResult.WorkflowState)
+		queryResult.WorkflowID = execution.ID
+		queryResult.RunID = execution.RunID
+		h.logger.Info("Started Setup workflow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
+		h.logger.Info("Query Result", zap.Any("hasValue", queryResult))
+		//execution.AppendObject("query", resp)
+
+		js, _ := json.Marshal(queryResult)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(js)
+	} else {
+		_, _ = w.Write([]byte("Invalid Method!" + r.Method))
+	}
+}
+
+func (h *Service) triggerOnboarding(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		applicantID := r.URL.Query().Get("applicant_id")
+		h.logger.Info("####### flow!", zap.String("applicantId", applicantID))
+
+		wo := client.StartWorkflowOptions{
+			TaskList:                     workflows.TaskListName,
+			ExecutionStartToCloseTimeout: time.Hour * 24,
+		}
+		execution, err := h.cadenceAdapter.CadenceClient.StartWorkflow(context.Background(), wo, workflows.OnboardingWorkflow, applicantID)
+		if err != nil {
+			http.Error(w, "Error starting Onboarding workflow!", http.StatusBadRequest)
+			return
+		}
+
+		resp, err := h.cadenceAdapter.CadenceClient.QueryWorkflowWithOptions(context.Background(), &client.QueryWorkflowWithOptionsRequest{
+			WorkflowID:            execution.ID,
+			RunID:                 execution.RunID,
+			QueryType:             "state",
+			QueryConsistencyLevel: s.QueryConsistencyLevelStrong.Ptr(),
+		})
+
+		if err != nil {
+			http.Error(w, "Error starting Onboarding workflow!", http.StatusBadRequest)
+			return
+		}
+
+		queryResult:= workflows.Response{}
+		resp.QueryResult.Get(&queryResult.WorkflowState)
+		queryResult.WorkflowID = execution.ID
+		queryResult.RunID = execution.RunID
+		h.logger.Info("Started Onboarding workflow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
+		h.logger.Info("Query Result", zap.Any("hasValue", queryResult))
+		//execution.AppendObject("query", resp)
+
+		js, _ := json.Marshal(queryResult)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(js)
 	} else {
@@ -421,6 +503,8 @@ func main() {
 	service := Service{&cadenceClient, appConfig.Logger}
 	http.HandleFunc("/api/start-signup-workflow", service.triggerHelloWorld)
 	http.HandleFunc("/api/start-orientation-workflow", service.triggerOrientation)
+	http.HandleFunc("/api/start-setup-workflow", service.triggerSetup)
+	http.HandleFunc("/api/start-onboarding-workflow", service.triggerOnboarding)
 	http.HandleFunc("/api/get-current-screen", service.LastCompletedActivity)
 	http.HandleFunc("/api/submit", service.submit)
 	http.HandleFunc("/api/signal-hello-world", service.signalHelloWorld)

@@ -12,6 +12,17 @@ func init() {
 	workflow.Register(OrientationWorkflow)
 }
 
+type Response struct {
+	Execution
+	WorkflowState WorkflowState `json:"workflow_state"`
+}
+
+type Execution struct {
+	WorkflowID string `json:"workflow_id"`
+	RunID	  string `json:"run_id"`
+}
+
+
 type WorkflowState struct {
     Current WorkflowStep   `json:"current"`
     Steps   []WorkflowStep `json:"steps"`
@@ -21,8 +32,8 @@ type WorkflowStep struct {
     Action     string  `json:"action"`
     Index      int     `json:"index"`
     Status     string  `json:"status"`
-    WorkflowID string `json:"workflow_id,omitempty"`
-	RunID      string `json:"run_id,omitempty"`
+    WorkflowID *string `json:"workflow_id,omitempty"`
+	RunID      *string `json:"run_id,omitempty"`
 }
 
 func OrientationWorkflow(ctx workflow.Context, applicantID string) (string, error) {
@@ -40,8 +51,8 @@ func OrientationWorkflow(ctx workflow.Context, applicantID string) (string, erro
 		Action: "orientation",
 		Index: 1,
 		Status: "IN_PROGRESS",
-		WorkflowID: workflowID,
-		RunID: runID,
+		WorkflowID: &workflowID,
+		RunID: &runID,
 	}
 	
 	workflowState := WorkflowState{
@@ -57,7 +68,7 @@ func OrientationWorkflow(ctx workflow.Context, applicantID string) (string, erro
 	}
 
 	var activityResult string
-	err = workflow.ExecuteActivity(ctx, degreeDetailsActivity, applicantID, workflowID, runID).Get(ctx, &activityResult)
+	err = workflow.ExecuteActivity(ctx, orientationActivity, applicantID, workflowID, runID).Get(ctx, &activityResult)
 	if err != nil {
 		logger.Error("Degree Details Activity failed.", zap.Error(err))
 		return "", err

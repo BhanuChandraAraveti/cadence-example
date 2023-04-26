@@ -43,6 +43,11 @@ func init() {
 	activity.Register(teacherCETAndSOPActivity)
 	activity.Register(uploadLessonVideoActivity)
 	activity.Register(submitDocumentsActivity)
+	activity.Register(orientationActivity)
+	activity.Register(basicDetailsActivity)
+	activity.Register(agreementActivity)
+	activity.Register(profileActivity)
+	activity.Register(availabilityActivity)
 }
 
 var activityOptions = workflow.ActivityOptions{
@@ -241,6 +246,46 @@ func submitDocumentsActivity(ctx context.Context) (string, error) {
 	call_api()
 	logger.Info("Submit documents activity ended")
 	return "Submit documents activity ended", nil
+}
+
+func orientationActivity(ctx context.Context) (string, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("Orientation activity started")
+	call_api()
+	logger.Info("Orientation activity ended")
+	return "Orientation activity ended", nil
+}
+
+func basicDetailsActivity(ctx context.Context) (string, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("Basic details activity started")
+	call_api()
+	logger.Info("Basic details activity ended")
+	return "Basic details activity ended", nil
+}
+
+func agreementActivity(ctx context.Context) (string, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("Agreement activity started")
+	call_api()
+	logger.Info("Agreement activity ended")
+	return "Agreement activity ended", nil
+}
+
+func profileActivity(ctx context.Context) (string, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("Profile activity started")
+	call_api()
+	logger.Info("Profile activity ended")
+	return "Profile activity ended", nil
+}
+
+func availabilityActivity(ctx context.Context) (string, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("Availability activity started")
+	call_api()
+	logger.Info("Availability activity ended")
+	return "Availability activity ended", nil
 }
 
 type RequestBody struct {
