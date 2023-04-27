@@ -1,6 +1,9 @@
 package workflows
 
 import (
+	"context"
+
+	"go.uber.org/cadence/activity"
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
 )
@@ -8,56 +11,74 @@ import (
 // This is registration process where you register all your workflows
 // and activity function handlers.
 func init() {
-	workflow.Register(OrientationWorkflow)
+	workflow.Register(teacherSignupWorkflow)
 }
 
-type Response struct {
-	Execution
-	WorkflowState WorkflowState `json:"workflow_state"`
+func createTeacherSignupState() WorkflowState {
+
+	workflowState := WorkflowState{
+		Current: WorkflowStep{
+			Action: "signup",
+			Index: 1,
+			Status: "IN_PROGRESS",
+			WorkflowID: nil,
+			RunID: nil,
+		},
+		Steps: []WorkflowStep{
+			{
+				Action: "signup",
+				Index: 1,
+				Status: "IN_PROGRESS",
+				WorkflowID: nil,
+				RunID: nil,
+			},
+			{
+				Action: "degree",
+				Index: 2,
+				Status: "NOT_STARTED",
+				WorkflowID: nil,
+				RunID: nil,
+			},
+			{
+				Action: "stream",
+				Index: 3,
+				Status: "NOT_STARTED",
+				WorkflowID: nil,
+				RunID: nil,
+			},
+			{
+				Action: "experience",
+				Index: 4,
+				Status: "NOT_STARTED",
+				WorkflowID: nil,
+				RunID: nil,
+			},
+		},
+	}
+
+	return workflowState
 }
 
-type Execution struct {
-	WorkflowID string `json:"workflow_id"`
-	RunID	  string `json:"run_id"`
+func signupActivity(ctx context.Context) (string, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("Agreement activity started")
+	call_api()
+	logger.Info("Agreement activity ended")
+	return "Agreement activity ended", nil
 }
 
-
-type WorkflowState struct {
-    Current WorkflowStep   `json:"current"`
-    Steps   []WorkflowStep `json:"steps"`
-}
-
-type WorkflowStep struct {
-    Action     string  `json:"action"`
-    Index      int     `json:"index"`
-    Status     string  `json:"status"`
-    WorkflowID *string `json:"workflow_id,omitempty"`
-	RunID      *string `json:"run_id,omitempty"`
-}
-
-func OrientationWorkflow(ctx workflow.Context, applicantID string) (string, error) {
+func teacherSignupWorkflow(ctx workflow.Context, applicantID string) (string, error) {
 	ctx = workflow.WithActivityOptions(ctx, activityOptions)
 
 	logger := workflow.GetLogger(ctx)
-	logger.Info("Teacher Orientation workflow started")
+	logger.Info("Teacher Signup workflow started")
 	logger.Info("Applicant ID: " + applicantID)
 
 	info := workflow.GetInfo(ctx)
   	workflowID := info.WorkflowExecution.ID
 	runID := info.WorkflowExecution.RunID
 
-	workflowStep := WorkflowStep{
-		Action: "orientation",
-		Index: 1,
-		Status: "IN_PROGRESS",
-		WorkflowID: &workflowID,
-		RunID: &runID,
-	}
-	
-	workflowState := WorkflowState{
-		Current: workflowStep,
-		Steps: []WorkflowStep{workflowStep},
-	}
+	workflowState := createTeacherSignupState()
 
 	err := workflow.SetQueryHandler(ctx, "state", func(input []byte) (WorkflowState, error) {
 		return workflowState, nil

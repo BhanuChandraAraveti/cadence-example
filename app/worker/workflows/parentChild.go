@@ -1,4 +1,3 @@
-// app/worker/workflows/helloworldworkflows.go
 package workflows
 
 import (

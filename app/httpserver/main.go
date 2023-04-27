@@ -23,7 +23,7 @@ type Service struct {
 	logger         *zap.Logger
 }
 
-func (h *Service) triggerHelloWorld(w http.ResponseWriter, r *http.Request) {
+func (h *Service) triggerSignup(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		applicantID := r.URL.Query().Get("applicant_id")
 		h.logger.Info("####### flow!", zap.String("applicantId", applicantID))
@@ -32,13 +32,35 @@ func (h *Service) triggerHelloWorld(w http.ResponseWriter, r *http.Request) {
 			TaskList:                     workflows.TaskListName,
 			ExecutionStartToCloseTimeout: time.Hour * 24,
 		}
-		execution, err := h.cadenceAdapter.CadenceClient.StartWorkflow(context.Background(), wo, workflows.Workflow, applicantID)
+		execution, err := h.cadenceAdapter.CadenceClient.StartWorkflow(context.Background(), wo, workflows.SignupWorkflow, applicantID)
 		if err != nil {
 			http.Error(w, "Error starting workflow!", http.StatusBadRequest)
 			return
 		}
 
 		h.logger.Info("Started work flow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
+		js, _ := json.Marshal(execution)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(js)
+	} else {
+		_, _ = w.Write([]byte("Invalid Method!" + r.Method))
+	}
+}
+
+
+func (h *Service) triggerTeacherJourney(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		wo := client.StartWorkflowOptions{
+			TaskList:                     workflows.TaskListName,
+			ExecutionStartToCloseTimeout: time.Hour * 24,
+		}
+		execution, err := h.cadenceAdapter.CadenceClient.StartWorkflow(context.Background(), wo, workflows.TeacherJourneyWorkflow)
+		if err != nil {
+			http.Error(w, "Error starting teacher journey workflow!", http.StatusBadRequest)
+			return
+		}
+
+		h.logger.Info("Started teacher journey flow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
 		js, _ := json.Marshal(execution)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(js)
@@ -166,6 +188,50 @@ func (h *Service) triggerOnboarding(w http.ResponseWriter, r *http.Request) {
 		queryResult.WorkflowID = execution.ID
 		queryResult.RunID = execution.RunID
 		h.logger.Info("Started Onboarding workflow!", zap.String("WorkflowId", execution.ID), zap.String("RunId", execution.RunID))
+		h.logger.Info("Query Result", zap.Any("hasValue", queryResult))
+		//execution.AppendObject("query", resp)
+
+		js, _ := json.Marshal(queryResult)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(js)
+	} else {
+		_, _ = w.Write([]byte("Invalid Method!" + r.Method))
+	}
+}
+
+
+func (h *Service) getStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		h.logger.Info("$$$$$")
+
+		data := Mystruct{}
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		workflowID := data.WorkflowId
+		runID := data.RunId
+		h.logger.Info(workflowID)
+		h.logger.Info("payload", zap.Any("data", data))
+
+		resp, err := h.cadenceAdapter.CadenceClient.QueryWorkflowWithOptions(context.Background(), &client.QueryWorkflowWithOptionsRequest{
+			WorkflowID:            workflowID,
+			RunID:                 runID,
+			QueryType:             "state",
+			QueryConsistencyLevel: s.QueryConsistencyLevelStrong.Ptr(),
+		})
+
+		if err != nil {
+			http.Error(w, "Error getting status workflow!", http.StatusBadRequest)
+			return
+		}
+
+		queryResult:= workflows.Response{}
+		resp.QueryResult.Get(&queryResult.WorkflowState)
+		queryResult.WorkflowID = workflowID
+		queryResult.RunID = runID
 		h.logger.Info("Query Result", zap.Any("hasValue", queryResult))
 		//execution.AppendObject("query", resp)
 
@@ -501,7 +567,8 @@ func main() {
 	cadenceClient.Setup(&appConfig.Cadence)
 
 	service := Service{&cadenceClient, appConfig.Logger}
-	http.HandleFunc("/api/start-signup-workflow", service.triggerHelloWorld)
+	http.HandleFunc("/api/start-teacher-onboarding", service.triggerTeacherJourney)
+	http.HandleFunc("/api/start-signup-workflow", service.triggerSignup)
 	http.HandleFunc("/api/start-orientation-workflow", service.triggerOrientation)
 	http.HandleFunc("/api/start-setup-workflow", service.triggerSetup)
 	http.HandleFunc("/api/start-onboarding-workflow", service.triggerOnboarding)
@@ -511,6 +578,7 @@ func main() {
 	http.HandleFunc("/api/orientation-start", service.orientationStart)
 	http.HandleFunc("/api/start-parent", service.parentStart)
 	http.HandleFunc("/api/history", service.check)
+	http.HandleFunc("/api/get-status", service.getStatus)
 
 	addr := ":3030"
 	log.Println("Starting Server! Listening on:", addr)

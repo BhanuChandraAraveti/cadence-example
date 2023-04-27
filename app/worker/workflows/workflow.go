@@ -1,4 +1,3 @@
-// app/worker/workflows/helloworldworkflows.go
 package workflows
 
 import (
@@ -48,6 +47,7 @@ func init() {
 	activity.Register(agreementActivity)
 	activity.Register(profileActivity)
 	activity.Register(availabilityActivity)
+	activity.Register(templateActivity)
 }
 
 var activityOptions = workflow.ActivityOptions{
@@ -104,79 +104,6 @@ func overviewActivity(ctx context.Context, name string) (string, error) {
 	call_api()
 	return "Overview activity completed", nil
 }
-
-// func Workflow(ctx workflow.Context, name string) (string, error) {
-// 	ctx = workflow.WithActivityOptions(ctx, activityOptions)
-// 	state:= State{CurrentActivity: "default"}
-
-// 	ctx = internal.WithValue(ctx, "state", state)
-
-// 	logger := workflow.GetLogger(ctx)
-// 	logger.Info("Teacher workflow started")
-// 	var activityResult string
-// 	err := workflow.ExecuteActivity(ctx, overviewActivity, name).Get(ctx, &activityResult)
-// 	if err != nil {
-// 		logger.Error("Overview Activity failed.", zap.Error(err))
-// 		return "", err
-// 	}
-
-// 	// After saying hello, the workflow will wait for you to inform it of your age!
-// 	signalName := SignalName
-// 	selector := workflow.NewSelector(ctx)
-// 	var ageResult int
-
-// 	for {
-// 		signalChan := workflow.GetSignalChannel(ctx, signalName)
-// 		selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
-// 			c.Receive(ctx, &ageResult)
-// 			workflow.GetLogger(ctx).Info("Received age results from signal!", zap.String("signal", signalName), zap.Int("value", ageResult))
-// 		})
-// 		workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
-// 		// Wait for signal
-// 		selector.Select(ctx)
-
-// 		// We can check the age and return an appropriate response
-// 		if ageResult > 50{
-// 			logger.Info("Workflow completed.", zap.String("NameResult", activityResult), zap.Int("AgeResult", ageResult))
-
-// 			return fmt.Sprintf("Hello "+name+"! Let's make teaching fun!", ageResult), nil
-// 		}
-			
-// 		var futures []workflow.Future
-// 		// starts activities in parallel
-// 		ao := workflow.ActivityOptions{
-// 			ScheduleToStartTimeout: time.Minute,
-// 			StartToCloseTimeout:    time.Minute,
-// 			HeartbeatTimeout:       time.Second * 20,
-// 		}
-// 		ctx = workflow.WithActivityOptions(ctx, ao)
-
-// 		totalBranches := 2
-// 		//evaluationActivities := [evalCETActivity, evalSOPActivity]
-// 		for i := 1; i <= totalBranches; i++ {
-// 			activityInput := fmt.Sprintf("branch %d of %d.", i, totalBranches)
-// 			future := workflow.ExecuteActivity(ctx, evalCETActivity, activityInput)
-// 			futures = append(futures, future)
-// 		}
-
-// 		// wait until all futures are done
-// 		var sum int
-// 		for _, future := range futures {
-// 			var result int
-// 			if err := future.Get(ctx, &result); err != nil {
-// 				return "", err
-// 			}
-// 			sum += result
-// 		}
-
-// 		if sum < 150 {
-// 			workflow.NewContinueAsNewError(ctx, Workflow, name)
-// 		}
-
-// 		workflow.GetLogger(ctx).Info("Workflow completed.")
-// 	}
-// }
-
 
 func degreeDetailsActivity(ctx context.Context, applicationID string, workflowID string, runID string) (string, error) {
 
@@ -280,6 +207,15 @@ func profileActivity(ctx context.Context) (string, error) {
 	return "Profile activity ended", nil
 }
 
+func templateActivity(ctx context.Context, name string) (string, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info(name + " activity started")
+	logger.Info(name + " activity ended")
+	return "Profile activity ended", nil
+}
+
+
+
 func availabilityActivity(ctx context.Context) (string, error) {
 	logger := activity.GetLogger(ctx)
 	logger.Info("Availability activity started")
@@ -299,32 +235,6 @@ func call(data Mystruct) (string, error) {
 		return status, err
 	}
 	return "", nil
-
-	// // Create request body
-    // requestBody := RequestBody{
-    //     Name:  "John Doe",
-    //     Email: "johndoe@example.com",
-    // }
-    // requestBodyBytes, err := json.Marshal(requestBody)
-    // if err != nil {
-    //     return "", err
-    // }
-
-    // // Create HTTP request
-    // req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestBodyBytes))
-    // if err != nil {
-    //     return "", err
-    // }
-    // req.Header.Set("Content-Type", "application/json")
-
-    // // Make API call
-    // client := http.Client{}
-    // resp, err := client.Do(req)
-    // if err != nil {
-    //     return "", err
-    // }
-    // defer resp.Body.Close()
-	// return "BE call function ended", nil
 }
 
 type Mystruct struct {
@@ -336,7 +246,6 @@ type Mystruct struct {
 
 func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	ctx = workflow.WithActivityOptions(ctx, activityOptions)
-	//state := State{CurrentState: "Pre-"}
 
 	logger := workflow.GetLogger(ctx)
 	logger.Info("Teacher signup workflow started")
@@ -450,10 +359,6 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	// Wait for signal
 	selector.Select(ctx)
 
-	// call BE API
-	// msg, err = call(data)
-	// logger.Info(msg)
-	//
 
 
 	// CET and SOP
@@ -474,11 +379,6 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	// Wait for signal
 	selector.Select(ctx)
 
-	// call BE API
-	// msg, err = call(data)
-	// logger.Info(msg)
-	//
-
 
 	// Upload Lesson Video
 	selector = workflow.NewSelector(ctx)
@@ -497,12 +397,6 @@ func Workflow(ctx workflow.Context, applicantID string) (string, error) {
 	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
 	// Wait for signal
 	selector.Select(ctx)
-
-	// call BE API
-	// msg, err = call(data)
-	// logger.Info(msg)
-	//
-
 
 
 	// Submit Documents
