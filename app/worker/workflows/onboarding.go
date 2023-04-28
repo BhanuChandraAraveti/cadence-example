@@ -80,7 +80,7 @@ func OnboardingWorkflow(ctx workflow.Context, applicantID string) (string, error
 	cwo := workflow.ChildWorkflowOptions{
 		// Do not specify WorkflowID if you want cadence to generate a unique ID for child execution
 		WorkflowID:                   childID,
-		ExecutionStartToCloseTimeout: time.Hour,
+		ExecutionStartToCloseTimeout: time.Hour*24*7*1000,
 	}
 	ctx = workflow.WithChildOptions(ctx, cwo)
 	var result string

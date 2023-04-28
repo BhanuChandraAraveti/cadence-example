@@ -200,6 +200,49 @@ func (h *Service) triggerOnboarding(w http.ResponseWriter, r *http.Request) {
 }
 
 
+func (h *Service) getStatusSingle(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		h.logger.Info("$$$$$")
+
+		data := Mystruct{}
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		workflowID := data.WorkflowId
+		runID := data.RunId
+		h.logger.Info(workflowID)
+		h.logger.Info("payload", zap.Any("data", data))
+
+		resp, err := h.cadenceAdapter.CadenceClient.QueryWorkflowWithOptions(context.Background(), &client.QueryWorkflowWithOptionsRequest{
+			WorkflowID:            workflowID,
+			RunID:                 runID,
+			QueryType:             "state",
+			QueryConsistencyLevel: s.QueryConsistencyLevelStrong.Ptr(),
+		})
+
+		if err != nil {
+			http.Error(w, "Error getting status workflow!", http.StatusBadRequest)
+			return
+		}
+
+		queryResult:= workflows.Response2{}
+		resp.QueryResult.Get(&queryResult.WorkflowData)
+		queryResult.WorkflowID = workflowID
+		queryResult.RunID = runID
+		h.logger.Info("Query Result", zap.Any("hasValue", queryResult))
+		//execution.AppendObject("query", resp)
+
+		js, _ := json.Marshal(queryResult)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(js)
+	} else {
+		_, _ = w.Write([]byte("Invalid Method!" + r.Method))
+	}
+}
+
 func (h *Service) getStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		h.logger.Info("$$$$$")
@@ -234,6 +277,25 @@ func (h *Service) getStatus(w http.ResponseWriter, r *http.Request) {
 		queryResult.RunID = runID
 		h.logger.Info("Query Result", zap.Any("hasValue", queryResult))
 		//execution.AppendObject("query", resp)
+
+
+		resp, err = h.cadenceAdapter.CadenceClient.QueryWorkflowWithOptions(context.Background(), &client.QueryWorkflowWithOptionsRequest{
+			WorkflowID:            queryResult.Execution.WorkflowID,
+			RunID:                 queryResult.Execution.RunID,
+			QueryType:             "state",
+			QueryConsistencyLevel: s.QueryConsistencyLevelStrong.Ptr(),
+		})
+
+		if err != nil {
+			http.Error(w, "Error getting status workflow!", http.StatusBadRequest)
+			return
+		}
+
+		childQueryResult:= workflows.Response{}
+		resp.QueryResult.Get(&childQueryResult.WorkflowState)
+		childQueryResult.WorkflowID = workflowID
+		childQueryResult.RunID = runID
+		h.logger.Info("Child Query Result", zap.Any("hasValue", childQueryResult))
 
 		js, _ := json.Marshal(queryResult)
 		w.Header().Set("Content-Type", "application/json")
@@ -578,6 +640,7 @@ func main() {
 	http.HandleFunc("/api/orientation-start", service.orientationStart)
 	http.HandleFunc("/api/start-parent", service.parentStart)
 	http.HandleFunc("/api/history", service.check)
+	http.HandleFunc("/api/get-status-single", service.getStatusSingle)
 	http.HandleFunc("/api/get-status", service.getStatus)
 
 	addr := ":3030"

@@ -16,10 +16,10 @@ type Response struct {
 	WorkflowState WorkflowState `json:"workflow_state"`
 }
 
-type Execution struct {
-	WorkflowID string `json:"workflow_id"`
-	RunID	  string `json:"run_id"`
-}
+// type Execution struct {
+// 	WorkflowID string `json:"workflow_id"`
+// 	RunID	  string `json:"run_id"`
+// }
 
 
 type WorkflowState struct {

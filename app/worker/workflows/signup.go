@@ -21,6 +21,9 @@ func SignupWorkflow(ctx workflow.Context) (string, error) {
   	workflowID := info.WorkflowExecution.ID
 	runID := info.WorkflowExecution.RunID
 
+	//parentState.Current.WorkflowID = &workflowID
+	//parentState.Current.Status = "IT WORKED"
+
 	workflowStep := WorkflowStep{
 		Action: "signup",
 		Index: 1,
@@ -40,7 +43,7 @@ func SignupWorkflow(ctx workflow.Context) (string, error) {
 	if err != nil {
 		logger.Info("SetQueryHandler failed: " + err.Error())
 	}
-
+	
 	var activityResult string
 	err = workflow.ExecuteActivity(ctx, templateActivity, "Signup").Get(ctx, &activityResult)
 	if err != nil {
