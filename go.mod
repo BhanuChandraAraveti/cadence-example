@@ -1,6 +1,6 @@
-module github.com/nndd91/cadence-api-example
+module github.com/BhanuChandraAraveti/cadence-example
 
-go 1.20
+go 1.19
 
 require (
 	github.com/spf13/viper v1.15.0

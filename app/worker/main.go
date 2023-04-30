@@ -4,9 +4,10 @@ package main
 import (
 	"fmt"
 
-	"github.com/nndd91/cadence-api-example/app/adapters/cadenceAdapter"
-	"github.com/nndd91/cadence-api-example/app/config"
-	"github.com/nndd91/cadence-api-example/app/worker/workflows"
+	"github.com/BhanuChandraAraveti/cadence-example/app/adapters/cadenceAdapter"
+	"github.com/BhanuChandraAraveti/cadence-example/app/config"
+	"github.com/BhanuChandraAraveti/cadence-example/app/worker/workflows"
+
 	"go.uber.org/cadence/worker"
 	"go.uber.org/zap"
 )

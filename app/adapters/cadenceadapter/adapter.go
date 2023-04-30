@@ -4,7 +4,8 @@ package cadenceAdapter
 import (
 	"context"
 
-	"github.com/nndd91/cadence-api-example/app/config"
+	"github.com/BhanuChandraAraveti/cadence-example/app/config"
+
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/client"

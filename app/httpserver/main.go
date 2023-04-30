@@ -10,9 +10,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nndd91/cadence-api-example/app/adapters/cadenceAdapter"
-	"github.com/nndd91/cadence-api-example/app/config"
-	"github.com/nndd91/cadence-api-example/app/worker/workflows"
+	"github.com/BhanuChandraAraveti/cadence-example/app/adapters/cadenceAdapter"
+	"github.com/BhanuChandraAraveti/cadence-example/app/config"
+	"github.com/BhanuChandraAraveti/cadence-example/app/worker/workflows"
+
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/client"
 	"go.uber.org/zap"
