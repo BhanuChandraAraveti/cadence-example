@@ -41,15 +41,11 @@ func createTeacherJourneyData() WorkflowData {
 	
 	workflowData := WorkflowData{
 		ParentWorkflowInfo: WorkflowInfo{
-			Activity: "signup",
+			Activity: "lead",
 			Steps: []WorkflowStep2{
 				{
-					Activity: "signup",
-					Status: "IN_PROGRESS",
-				},
-				{
 					Activity: "lead",
-					Status: "NOT_STARTED",
+					Status: "IN_PROGRESS",
 				},
 				{
 					Activity: "application",
@@ -57,11 +53,19 @@ func createTeacherJourneyData() WorkflowData {
 				},
 			},
 		},
-		Activity: "signup",
+		Activity: "select-degree",
 		Steps: []WorkflowStep2{
 			{
-				Activity: "signup",
-				Status: "IN_PROGRESS",
+				Activity: "select-degree",
+				Status: "NOT_STARTED",
+			},
+			{
+				Activity: "select-stream",
+				Status: "NOT_STARTED",
+			},
+			{
+				Activity: "select-experience",
+				Status: "NOT_STARTED",
 			},
 		},
 	}
@@ -85,11 +89,12 @@ func TeacherJourneyWorkflow(ctx workflow.Context) (string, error) {
 		logger.Info("SetQueryHandler failed: " + err.Error())
 	}
 
-	// SIGNUP
+
+	// SELECT DEGREE
 	var activityResult string
-	err = workflow.ExecuteActivity(ctx, templateActivity, "Signup").Get(ctx, &activityResult)
+	err = workflow.ExecuteActivity(ctx, templateActivity, "Select Degree").Get(ctx, &activityResult)
 	if err != nil {
-		logger.Error("Signup Activity failed.", zap.Error(err))
+		logger.Error("Select Degree Activity failed.", zap.Error(err))
 		return "", err
 	}
 
@@ -104,44 +109,9 @@ func TeacherJourneyWorkflow(ctx workflow.Context) (string, error) {
 	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
 	selector.Select(ctx)
 	logger.Info("payload", zap.Any("data", data))
-	workflowData.ParentWorkflowInfo.Activity = "lead"
-	workflowData.ParentWorkflowInfo.Steps[0].Status = "COMPLETED"
-	workflowData.ParentWorkflowInfo.Steps[1].Status = "IN_PROGRESS"
-	workflowData.Activity = "select-degree"
-	workflowData.Steps = []WorkflowStep2{
-		{
-			Activity: "select-degree",
-			Status: "IN_PROGRESS",
-		},
-		{
-			Activity: "select-stream",
-			Status: "NOT_STARTED",
-		},
-		{
-			Activity: "select-experience",
-			Status: "NOT_STARTED",
-		},
-	}
-
-	// SELECT DEGREE
-	err = workflow.ExecuteActivity(ctx, templateActivity, "Select Degree").Get(ctx, &activityResult)
-	if err != nil {
-		logger.Error("Select Degree Activity failed.", zap.Error(err))
-		return "", err
-	}
-
-
-	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
-		c.Receive(ctx, &data)
-		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
-	})
-	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
-	selector.Select(ctx)
-	logger.Info("payload", zap.Any("data", data))
 
 	workflowData.Activity = "select-stream"
 	workflowData.Steps[0].Status = "COMPLETED"
-	workflowData.Steps[1].Status = "IN_PROGRESS"
 
 
 	// SELECT STREAM
@@ -159,7 +129,6 @@ func TeacherJourneyWorkflow(ctx workflow.Context) (string, error) {
 	logger.Info("payload", zap.Any("data", data))
 	workflowData.Activity = "select-experience"
 	workflowData.Steps[1].Status = "COMPLETED"
-	workflowData.Steps[2].Status = "IN_PROGRESS"
 
 	// SELECT EXPERIENCE
 	err = workflow.ExecuteActivity(ctx, templateActivity, "Select Experience").Get(ctx, &activityResult)
@@ -176,13 +145,13 @@ func TeacherJourneyWorkflow(ctx workflow.Context) (string, error) {
 	logger.Info("payload", zap.Any("data", data))
 
 	workflowData.ParentWorkflowInfo.Activity = "application"
-	workflowData.ParentWorkflowInfo.Steps[1].Status = "COMPLETED"
-	workflowData.ParentWorkflowInfo.Steps[2].Status = "IN_PROGRESS"
+	workflowData.ParentWorkflowInfo.Steps[0].Status = "COMPLETED"
+	workflowData.ParentWorkflowInfo.Steps[1].Status = "IN_PROGRESS"
 	workflowData.Activity = "watch-video"
 	workflowData.Steps = []WorkflowStep2{
 		{
 			Activity: "watch-video",
-			Status: "IN_PROGRESS",
+			Status: "NOT_STARTED",
 		},
 		{
 			Activity: "select-grade",
@@ -212,7 +181,6 @@ func TeacherJourneyWorkflow(ctx workflow.Context) (string, error) {
 	logger.Info("payload", zap.Any("data", data))
 	workflowData.Activity = "select-grade"
 	workflowData.Steps[0].Status = "COMPLETED"
-	workflowData.Steps[1].Status = "IN_PROGRESS"
 
 
 	// SELECT GRADE
@@ -230,7 +198,6 @@ func TeacherJourneyWorkflow(ctx workflow.Context) (string, error) {
 	logger.Info("payload", zap.Any("data", data))
 	workflowData.Activity = "screening"
 	workflowData.Steps[1].Status = "COMPLETED"
-	workflowData.Steps[2].Status = "IN_PROGRESS"
 
 	// SCREENING
 	err = workflow.ExecuteActivity(ctx, templateActivity, "Screening").Get(ctx, &activityResult)
@@ -243,11 +210,21 @@ func TeacherJourneyWorkflow(ctx workflow.Context) (string, error) {
 		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
 	})
 	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
+	selector.Select(ctx)
+	logger.Info("payload", zap.Any("data", data))
+	workflowData.Steps[2].Status = "IN_PROGRESS"
 
+	// SCREENING IN_PROGRESS
+	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
+		c.Receive(ctx, &data)
+		workflow.GetLogger(ctx).Info("Received the signal!", zap.String("signal", signalName))
+	})
+	workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
 	selector.Select(ctx)
 	logger.Info("payload", zap.Any("data", data))
 	workflowData.Steps[2].Status = "COMPLETED"
-	workflowData.ParentWorkflowInfo.Steps[2].Status = "COMPLETED"
+    workflowData.ParentWorkflowInfo.Steps[1].Status = "COMPLETED"
+	workflowData.Activity = "success"
 
 	selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
 		c.Receive(ctx, &data)
