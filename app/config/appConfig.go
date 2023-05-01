@@ -27,6 +27,8 @@ func (h *AppConfig) Setup() {
 	viper.AddConfigPath("app/resources") // These two lines will make sure viper pulls the config from app/resources/application.yml
 	viper.AutomaticEnv() // This allows viper to read variables from the environment variables if they exists.
 	viper.SetConfigType("yml")
+	// serviceHost := os.Getenv("SERVICE_HOST")
+	// viper.Set("cadence.hostPort", serviceHost)
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Printf("Error reading config file, %s", err)
 	}

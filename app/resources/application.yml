@@ -7,4 +7,5 @@ env: "development"
 cadence:
   domain: "simple-domain"
   service: "cadence-frontend"
-  hostPort: "127.0.0.1:7933"
+  # hostPort: "127.0.0.1:7933"
+  hostPort: "host.docker.internal:7933"
